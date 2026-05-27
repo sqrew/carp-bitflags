@@ -1,4 +1,11 @@
-(doc BitFlags "is a type-safe wrapper for integer bitmasks.")
+(doc BitFlags "is a type-safe wrapper for integer bitmasks.
+
+### Design Philosophy
+The BitFlags module provides a lightweight, zero-overhead abstraction for managing named bitmasks.
+It follows a tiered design:
+1. **Inspection**: `contains?` (all bits present), `intersects?` (any bit present), and `empty?`.
+2. **Mutation**: `set!`, `unset!`, `toggle!`, and `clear!` for in-place modifications.
+3. **Functional**: `with`, `without`, `union`, and `intersection` for creating new flag sets.")
 (deftype (BitFlags t) [
   mask t
 ])
@@ -7,6 +14,15 @@
   (doc new "creates a new BitFlags instance with the given initial mask.")
   (defn new [m]
     (BitFlags.init m))
+
+  (doc zero "returns an empty BitFlags instance.")
+  (defn zero []
+    (BitFlags.init (zero)))
+  (implements zero BitFlags.zero)
+
+  (doc to-int "returns the raw underlying bitmask value.")
+  (defn to-int [f]
+    @(BitFlags.mask f))
 
   (doc set! "sets a flag in the mask (bitwise OR).")
   (defn set! [f flag]
@@ -20,17 +36,38 @@
   (defn toggle! [f flag]
     (BitFlags.set-mask! f (bit-xor @(BitFlags.mask f) flag)))
 
-  (doc set? "checks if a flag is set in the mask.")
-  (defn set? [f flag]
+  (doc contains? "checks if ALL bits in the given flag are set in the mask.")
+  (defn contains? [f flag]
     (= (bit-and @(BitFlags.mask f) flag) flag))
 
-  (doc any? "checks if any of the flags in the given mask are set.")
-  (defn any? [f flags]
+  (doc set? "alias for contains?.")
+  (defn set? [f flag]
+    (BitFlags.contains? f flag))
+
+  (doc intersects? "checks if ANY of the bits in the given flags are set in the mask.")
+  (defn intersects? [f flags]
     (not (= (bit-and @(BitFlags.mask f) flags) (zero))))
+
+  (doc any? "alias for intersects?.")
+  (defn any? [f flags]
+    (BitFlags.intersects? f flags))
+
+  (doc empty? "checks if the bitmask is zero.")
+  (defn empty? [f]
+    (= @(BitFlags.mask f) (zero)))
+  (implements empty? BitFlags.empty?)
 
   (doc clear! "resets the mask to zero.")
   (defn clear! [f]
     (BitFlags.set-mask! f (zero)))
+
+  (doc with "returns a new BitFlags with the given flag set.")
+  (defn with [f flag]
+    (BitFlags.init (bit-or @(BitFlags.mask f) flag)))
+
+  (doc without "returns a new BitFlags with the given flag unset.")
+  (defn without [f flag]
+    (BitFlags.init (bit-and @(BitFlags.mask f) (bit-not flag))))
 
   (doc union "returns a new BitFlags set that is the union of two others.")
   (defn union [a b]
@@ -53,22 +90,28 @@
   (defn str [f]
     (str @(BitFlags.mask f)))
   (implements str BitFlags.str)
-
-  (doc set "returns a new BitFlags with the given flag set.")
-  (defn set [f flag]
-    (BitFlags.init (bit-or @(BitFlags.mask &f) flag)))
-
-  (doc unset "returns a new BitFlags with the given flag unset.")
-  (defn unset [f flag]
-    (BitFlags.init (bit-and @(BitFlags.mask &f) (bit-not flag))))
 )
 
-(defndynamic bitflags-internal [flags]
+(defndynamic bitflags-internal [flags current-bit]
   (if (= (length flags) 0)
     '()
-    (cons (list 'def (car flags) (cadr flags)) (bitflags-internal (cddr flags)))))
+    (let [name (car flags)
+          rest (cdr flags)]
+      (if (and (> (length rest) 0) (not (symbol? (car rest))))
+        (let [val (car rest)
+              next-rest (cdr rest)]
+          (do
+            (eval (list 'def name val))
+            (bitflags-internal next-rest (* val 2))))
+        (do
+          (eval (list 'def name current-bit))
+          (bitflags-internal rest (* current-bit 2)))))))
 
-(doc bitflags "is a macro to define a set of bitflag constants.
-Example: (bitflags [Read 1 Write 2 Execute 4])")
+(doc bitflags "is a macro to define a set of bitflag constants. 
+It supports both explicit values and auto-incrementing powers of two.
+Example: (bitflags [Read 1 Write 2 Execute 4 Admin 32])
+Example (Auto): (bitflags [FlagA FlagB FlagC]) ; 1, 2, 4")
 (defmacro bitflags [flags]
-  (cons 'do (bitflags-internal flags)))
+  (do
+    (bitflags-internal flags 1)
+    '()))

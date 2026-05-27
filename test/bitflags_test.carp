@@ -7,56 +7,67 @@
 (def Write 2)
 (def Execute 4)
 
-;; We use def directly here because macro expansion at the top level
-;; can sometimes be tricky for the test runner environment.
-(def FlagA 8)
-(def FlagB 16)
+(bitflags [FlagA 8 FlagB 16])
+(bitflags [AutoA AutoB AutoC]) ; Should be 1, 2, 4
 
 (deftest bitflags-test
   (let [f (BitFlags.new 0)
         state (Test.State.init 0 0)]
     (do
-      (set! state (assert-equal &state 0 @(BitFlags.mask &f) "Initial mask is 0"))
+      (set! state (assert-equal &state 0 (BitFlags.to-int &f) "Initial mask is 0"))
+      (set! state (assert-true &state (BitFlags.empty? &f) "empty? works on initial"))
       
       (BitFlags.set! &f Read)
-      (set! state (assert-true &state (BitFlags.set? &f Read) "Flag Read is set"))
-      (set! state (assert-equal &state 1 @(BitFlags.mask &f) "Mask is 1 after setting Read"))
+      (set! state (assert-true &state (BitFlags.contains? &f Read) "contains? Read is set"))
+      (set! state (assert-equal &state 1 (BitFlags.to-int &f) "Mask is 1 after setting Read"))
       
       (BitFlags.set! &f Write)
-      (set! state (assert-true &state (BitFlags.set? &f Write) "Flag Write is set"))
-      (set! state (assert-equal &state 3 @(BitFlags.mask &f) "Mask is 3 after setting Write"))
+      (set! state (assert-true &state (BitFlags.contains? &f Write) "contains? Write is set"))
+      (set! state (assert-equal &state 3 (BitFlags.to-int &f) "Mask is 3 after setting Write"))
       
       (BitFlags.unset! &f Read)
-      (set! state (assert-false &state (BitFlags.set? &f Read) "Flag Read is unset"))
-      (set! state (assert-equal &state 2 @(BitFlags.mask &f) "Mask is 2 after unsetting Read"))
+      (set! state (assert-false &state (BitFlags.contains? &f Read) "contains? Read is unset"))
+      (set! state (assert-equal &state 2 (BitFlags.to-int &f) "Mask is 2 after unsetting Read"))
       
       (BitFlags.toggle! &f Execute)
-      (set! state (assert-true &state (BitFlags.set? &f Execute) "Flag Execute is toggled on"))
-      (set! state (assert-equal &state 6 @(BitFlags.mask &f) "Mask is 6 after toggling Execute"))
+      (set! state (assert-true &state (BitFlags.contains? &f Execute) "toggle! on works"))
+      (set! state (assert-equal &state 6 (BitFlags.to-int &f) "Mask is 6 after toggling Execute"))
       
       (BitFlags.toggle! &f Execute)
-      (set! state (assert-false &state (BitFlags.set? &f Execute) "Flag Execute is toggled off"))
+      (set! state (assert-false &state (BitFlags.contains? &f Execute) "toggle! off works"))
       
-      (set! state (assert-true &state (BitFlags.any? &f (bit-or Read Write)) "any? works (positive)"))
-      (set! state (assert-false &state (BitFlags.any? &f Execute) "any? works (negative)"))
+      (set! state (assert-true &state (BitFlags.intersects? &f (bit-or Read Write)) "intersects? works (positive)"))
+      (set! state (assert-false &state (BitFlags.intersects? &f Execute) "intersects? works (negative)"))
       
       (BitFlags.clear! &f)
-      (set! state (assert-equal &state 0 @(BitFlags.mask &f) "Mask is 0 after clear!"))
+      (set! state (assert-equal &state 0 (BitFlags.to-int &f) "Mask is 0 after clear!"))
       
+      ;; Functional API
+      (let [fw (BitFlags.with &f FlagA)
+            fwo (BitFlags.without &fw FlagA)]
+        (do
+          (set! state (assert-equal &state 8 (BitFlags.to-int &fw) "with works"))
+          (set! state (assert-equal &state 0 (BitFlags.to-int &fwo) "without works"))))
+
       ;; Union/Intersection
       (let [a (BitFlags.new Read)
             b (BitFlags.new Write)
             u (BitFlags.union &a &b)
             i (BitFlags.intersection &u &a)]
         (do
-          (set! state (assert-equal &state 3 @(BitFlags.mask &u) "Union works"))
-          (set! state (assert-equal &state 1 @(BitFlags.mask &i) "Intersection works"))
+          (set! state (assert-equal &state 3 (BitFlags.to-int &u) "Union works"))
+          (set! state (assert-equal &state 1 (BitFlags.to-int &i) "Intersection works"))
           (set! state (assert-true &state (BitFlags.= &a &i) "Equality works"))))
       
-      ;; Macro test (using pre-defined constants)
+      ;; Macro test (Explicit)
       (let [f2 (BitFlags.new FlagA)]
         (do
           (BitFlags.set! &f2 FlagB)
-          (set! state (assert-equal &state 24 @(BitFlags.mask &f2) "Constants work"))))
+          (set! state (assert-equal &state 24 (BitFlags.to-int &f2) "Explicit macro constants work"))))
+
+      ;; Macro test (Auto)
+      (set! state (assert-equal &state 1 AutoA "Auto-incrementing FlagA is 1"))
+      (set! state (assert-equal &state 2 AutoB "Auto-incrementing FlagB is 2"))
+      (set! state (assert-equal &state 4 AutoC "Auto-incrementing FlagC is 4"))
 
       state)))

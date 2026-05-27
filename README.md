@@ -7,10 +7,11 @@ This module provides an idiomatic way to manage sets of bitmask flags using inte
 ## Features
 
 - **Type-Safe Wrappers**: Encapsulate raw integers into meaningful flag types.
+- **Precise Semantics**: Distinguishes between `contains?` (all) and `intersects?` (any).
 - **Fluent API**: Set, unset, toggle, and check flags with ease.
-- **Bitwise Composition**: $O(1)$ union, intersection, and difference of flag sets.
+- **Functional Support**: `with` and `without` for non-mutable compositions.
 - **Zero Overhead**: Compiles down to standard C bitwise operations.
-- **Macro Support**: Define a set of flags with minimal boilerplate.
+- **Hybrid Macro**: Define flags with explicit values or auto-incrementing powers of two.
 
 ## Design Philosophy
 
@@ -42,9 +43,9 @@ Add this to your project by loading `bitflags.carp`.
   (do
     (BitFlags.set! &f Read)
     (BitFlags.set! &f Write)
-    (IO.println &(str (BitFlags.set? &f Read))) ; true
+    (IO.println &(str (BitFlags.contains? &f Read))) ; true
     (BitFlags.toggle! &f Execute)
-    (IO.println &(str @(BitFlags.mask &f))))) ; 7
+    (IO.println &(str (BitFlags.to-int &f))))) ; 7
 ```
 
 ## Running Tests
