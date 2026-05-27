@@ -8,10 +8,11 @@ This module provides an idiomatic way to manage sets of bitmask flags using inte
 
 - **Type-Safe Wrappers**: Encapsulate raw integers into meaningful flag types.
 - **Precise Semantics**: Distinguishes between `contains?` (all) and `intersects?` (any).
+- **Full Set Logic**: Support for `union`, `intersection`, `difference`, `symmetric-difference`, and `subset?`.
 - **Fluent API**: Set, unset, toggle, and check flags with ease.
 - **Functional Support**: `with` and `without` for non-mutable compositions.
 - **Zero Overhead**: Compiles down to standard C bitwise operations.
-- **Hybrid Macro**: Define flags with explicit values or auto-incrementing powers of two.
+- **Hybrid Power-Macro**: Define flags with auto-incrementing powers of two or explicit `(Flag Value)` overrides.
 
 ## Design Philosophy
 
@@ -35,17 +36,15 @@ Add this to your project by loading `bitflags.carp`.
 ```clojure
 (use BitFlags)
 
-(def Read 1)
-(def Write 2)
-(def Execute 4)
+(bitflags [Read Write (Admin 32) Execute]) ; 1, 2, 32, 4
 
 (let [f (BitFlags.new 0)]
   (do
     (BitFlags.set! &f Read)
     (BitFlags.set! &f Write)
     (IO.println &(str (BitFlags.contains? &f Read))) ; true
-    (BitFlags.toggle! &f Execute)
-    (IO.println &(str (BitFlags.to-int &f))))) ; 7
+    (BitFlags.toggle! &f Admin)
+    (IO.println &(str (BitFlags.to-int &f))))) ; 35
 ```
 
 ## Running Tests

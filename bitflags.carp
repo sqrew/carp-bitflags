@@ -3,16 +3,20 @@
 ### Design Philosophy
 The BitFlags module provides a lightweight, zero-overhead abstraction for managing named bitmasks.
 It follows a tiered design:
-1. **Inspection**: `contains?` (all bits present), `intersects?` (any bit present), and `empty?`.
+1. **Inspection**: `contains?` (all bits present), `intersects?` (any bit present), `subset?`, and `empty?`.
 2. **Mutation**: `set!`, `unset!`, `toggle!`, and `clear!` for in-place modifications.
-3. **Functional**: `with`, `without`, `union`, and `intersection` for creating new flag sets.")
+3. **Functional**: `with`, `without`, `union`, `intersection`, and `symmetric-difference` for creating new flag sets.")
 (deftype (BitFlags t) [
-  mask t
+  value t
 ])
 
 (defmodule BitFlags
   (doc new "creates a new BitFlags instance with the given initial mask.")
   (defn new [m]
+    (BitFlags.init m))
+
+  (doc from-int "alias for new; creates a BitFlags from a raw integer.")
+  (defn from-int [m]
     (BitFlags.init m))
 
   (doc zero "returns an empty BitFlags instance.")
@@ -22,23 +26,27 @@ It follows a tiered design:
 
   (doc to-int "returns the raw underlying bitmask value.")
   (defn to-int [f]
-    @(BitFlags.mask f))
+    @(BitFlags.value f))
+
+  (doc mask "alias for to-int.")
+  (defn mask [f]
+    (BitFlags.to-int f))
 
   (doc set! "sets a flag in the mask (bitwise OR).")
   (defn set! [f flag]
-    (BitFlags.set-mask! f (bit-or @(BitFlags.mask f) flag)))
+    (BitFlags.set-value! f (bit-or @(BitFlags.value f) flag)))
 
   (doc unset! "unsets a flag in the mask (bitwise AND with NOT).")
   (defn unset! [f flag]
-    (BitFlags.set-mask! f (bit-and @(BitFlags.mask f) (bit-not flag))))
+    (BitFlags.set-value! f (bit-and @(BitFlags.value f) (bit-not flag))))
 
   (doc toggle! "toggles a flag in the mask (bitwise XOR).")
   (defn toggle! [f flag]
-    (BitFlags.set-mask! f (bit-xor @(BitFlags.mask f) flag)))
+    (BitFlags.set-value! f (bit-xor @(BitFlags.value f) flag)))
 
   (doc contains? "checks if ALL bits in the given flag are set in the mask.")
   (defn contains? [f flag]
-    (= (bit-and @(BitFlags.mask f) flag) flag))
+    (= (bit-and @(BitFlags.value f) flag) flag))
 
   (doc set? "alias for contains?.")
   (defn set? [f flag]
@@ -46,71 +54,80 @@ It follows a tiered design:
 
   (doc intersects? "checks if ANY of the bits in the given flags are set in the mask.")
   (defn intersects? [f flags]
-    (not (= (bit-and @(BitFlags.mask f) flags) (zero))))
+    (not (= (bit-and @(BitFlags.value f) flags) (zero))))
 
   (doc any? "alias for intersects?.")
   (defn any? [f flags]
     (BitFlags.intersects? f flags))
 
+  (doc subset? "checks if all flags in 'a' are also set in 'b'.")
+  (defn subset? [a b]
+    (BitFlags.contains? b (BitFlags.to-int a)))
+
   (doc empty? "checks if the bitmask is zero.")
   (defn empty? [f]
-    (= @(BitFlags.mask f) (zero)))
+    (= @(BitFlags.value f) (zero)))
   (implements empty? BitFlags.empty?)
 
   (doc clear! "resets the mask to zero.")
   (defn clear! [f]
-    (BitFlags.set-mask! f (zero)))
+    (BitFlags.set-value! f (zero)))
 
   (doc with "returns a new BitFlags with the given flag set.")
   (defn with [f flag]
-    (BitFlags.init (bit-or @(BitFlags.mask f) flag)))
+    (BitFlags.init (bit-or @(BitFlags.value f) flag)))
 
   (doc without "returns a new BitFlags with the given flag unset.")
   (defn without [f flag]
-    (BitFlags.init (bit-and @(BitFlags.mask f) (bit-not flag))))
+    (BitFlags.init (bit-and @(BitFlags.value f) (bit-not flag))))
 
   (doc union "returns a new BitFlags set that is the union of two others.")
   (defn union [a b]
-    (BitFlags.init (bit-or @(BitFlags.mask a) @(BitFlags.mask b))))
+    (BitFlags.init (bit-or @(BitFlags.value a) @(BitFlags.value b))))
 
   (doc intersection "returns a new BitFlags set that is the intersection of two others.")
   (defn intersection [a b]
-    (BitFlags.init (bit-and @(BitFlags.mask a) @(BitFlags.mask b))))
+    (BitFlags.init (bit-and @(BitFlags.value a) @(BitFlags.value b))))
 
   (doc difference "returns a new BitFlags set containing flags set in 'a' but not in 'b'.")
   (defn difference [a b]
-    (BitFlags.init (bit-and @(BitFlags.mask a) (bit-not @(BitFlags.mask b)))))
+    (BitFlags.init (bit-and @(BitFlags.value a) (bit-not @(BitFlags.value b)))))
+
+  (doc symmetric-difference "returns a new BitFlags set containing flags set in either 'a' or 'b', but not both.")
+  (defn symmetric-difference [a b]
+    (BitFlags.init (bit-xor @(BitFlags.value a) @(BitFlags.value b))))
 
   (doc = "checks if two bitflags sets are identical.")
   (defn = [a b]
-    (= @(BitFlags.mask a) @(BitFlags.mask b)))
+    (= @(BitFlags.value a) @(BitFlags.value b)))
   (implements = BitFlags.=)
 
   (doc str "returns a string representation of the underlying bitmask.")
   (defn str [f]
-    (str @(BitFlags.mask f)))
+    (str @(BitFlags.value f)))
   (implements str BitFlags.str)
 )
 
 (defndynamic bitflags-internal [flags current-bit]
   (if (= (length flags) 0)
     '()
-    (let [name (car flags)
+    (let [f (car flags)
           rest (cdr flags)]
-      (if (and (> (length rest) 0) (not (symbol? (car rest))))
-        (let [val (car rest)
-              next-rest (cdr rest)]
+      (if (list? f)
+        ;; Explicit value: (Name Value)
+        (let [name (car f)
+              val (cadr f)]
           (do
             (eval (list 'def name val))
-            (bitflags-internal next-rest (* val 2))))
+            (bitflags-internal rest (* val 2))))
+        ;; Auto-incrementing: Name
         (do
-          (eval (list 'def name current-bit))
+          (eval (list 'def f current-bit))
           (bitflags-internal rest (* current-bit 2)))))))
 
 (doc bitflags "is a macro to define a set of bitflag constants. 
-It supports both explicit values and auto-incrementing powers of two.
-Example: (bitflags [Read 1 Write 2 Execute 4 Admin 32])
-Example (Auto): (bitflags [FlagA FlagB FlagC]) ; 1, 2, 4")
+It supports both auto-incrementing powers of two and explicit overrides via (Flag Value) syntax.
+Example: (bitflags [Read Write (Admin 32) Execute])")
 (defmacro bitflags [flags]
   (do
     (bitflags-internal flags 1)

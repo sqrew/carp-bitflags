@@ -7,8 +7,7 @@
 (def Write 2)
 (def Execute 4)
 
-(bitflags [FlagA 8 FlagB 16])
-(bitflags [AutoA AutoB AutoC]) ; Should be 1, 2, 4
+(bitflags [AutoA AutoB (AutoD 8) AutoE]) ; 1, 2, 8, 16
 
 (deftest bitflags-test
   (let [f (BitFlags.new 0)
@@ -43,10 +42,10 @@
       (set! state (assert-equal &state 0 (BitFlags.to-int &f) "Mask is 0 after clear!"))
       
       ;; Functional API
-      (let [fw (BitFlags.with &f FlagA)
-            fwo (BitFlags.without &fw FlagA)]
+      (let [fw (BitFlags.with &f Read)
+            fwo (BitFlags.without &fw Read)]
         (do
-          (set! state (assert-equal &state 8 (BitFlags.to-int &fw) "with works"))
+          (set! state (assert-equal &state 1 (BitFlags.to-int &fw) "with works"))
           (set! state (assert-equal &state 0 (BitFlags.to-int &fwo) "without works"))))
 
       ;; Union/Intersection
@@ -59,15 +58,21 @@
           (set! state (assert-equal &state 1 (BitFlags.to-int &i) "Intersection works"))
           (set! state (assert-true &state (BitFlags.= &a &i) "Equality works"))))
       
-      ;; Macro test (Explicit)
-      (let [f2 (BitFlags.new FlagA)]
-        (do
-          (BitFlags.set! &f2 FlagB)
-          (set! state (assert-equal &state 24 (BitFlags.to-int &f2) "Explicit macro constants work"))))
+      ;; Macro test (Auto/Explicit Hybrid)
+      (set! state (assert-equal &state 1 AutoA "Auto-incrementing AutoA is 1"))
+      (set! state (assert-equal &state 2 AutoB "Auto-incrementing AutoB is 2"))
+      (set! state (assert-equal &state 8 AutoD "Explicit (AutoD 8) works"))
+      (set! state (assert-equal &state 16 AutoE "Auto-incrementing after explicit works (AutoE 16)"))
 
-      ;; Macro test (Auto)
-      (set! state (assert-equal &state 1 AutoA "Auto-incrementing FlagA is 1"))
-      (set! state (assert-equal &state 2 AutoB "Auto-incrementing FlagB is 2"))
-      (set! state (assert-equal &state 4 AutoC "Auto-incrementing FlagC is 4"))
+      ;; Subset
+      (let [sub (BitFlags.new Read)
+            sup (BitFlags.new (bit-or Read Write))]
+        (set! state (assert-true &state (BitFlags.subset? &sub &sup) "subset? works")))
+
+      ;; Symmetric Difference
+      (let [da (BitFlags.new (bit-or Read Write))
+            db (BitFlags.new (bit-or Write Execute))
+            sd (BitFlags.symmetric-difference &da &db)]
+        (set! state (assert-equal &state (bit-or Read Execute) (BitFlags.to-int &sd) "symmetric-difference works")))
 
       state)))
