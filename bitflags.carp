@@ -1,0 +1,74 @@
+(doc BitFlags "is a type-safe wrapper for integer bitmasks.")
+(deftype (BitFlags t) [
+  mask t
+])
+
+(defmodule BitFlags
+  (doc new "creates a new BitFlags instance with the given initial mask.")
+  (defn new [m]
+    (BitFlags.init m))
+
+  (doc set! "sets a flag in the mask (bitwise OR).")
+  (defn set! [f flag]
+    (BitFlags.set-mask! f (bit-or @(BitFlags.mask f) flag)))
+
+  (doc unset! "unsets a flag in the mask (bitwise AND with NOT).")
+  (defn unset! [f flag]
+    (BitFlags.set-mask! f (bit-and @(BitFlags.mask f) (bit-not flag))))
+
+  (doc toggle! "toggles a flag in the mask (bitwise XOR).")
+  (defn toggle! [f flag]
+    (BitFlags.set-mask! f (bit-xor @(BitFlags.mask f) flag)))
+
+  (doc set? "checks if a flag is set in the mask.")
+  (defn set? [f flag]
+    (= (bit-and @(BitFlags.mask f) flag) flag))
+
+  (doc any? "checks if any of the flags in the given mask are set.")
+  (defn any? [f flags]
+    (not (= (bit-and @(BitFlags.mask f) flags) (zero))))
+
+  (doc clear! "resets the mask to zero.")
+  (defn clear! [f]
+    (BitFlags.set-mask! f (zero)))
+
+  (doc union "returns a new BitFlags set that is the union of two others.")
+  (defn union [a b]
+    (BitFlags.init (bit-or @(BitFlags.mask a) @(BitFlags.mask b))))
+
+  (doc intersection "returns a new BitFlags set that is the intersection of two others.")
+  (defn intersection [a b]
+    (BitFlags.init (bit-and @(BitFlags.mask a) @(BitFlags.mask b))))
+
+  (doc difference "returns a new BitFlags set containing flags set in 'a' but not in 'b'.")
+  (defn difference [a b]
+    (BitFlags.init (bit-and @(BitFlags.mask a) (bit-not @(BitFlags.mask b)))))
+
+  (doc = "checks if two bitflags sets are identical.")
+  (defn = [a b]
+    (= @(BitFlags.mask a) @(BitFlags.mask b)))
+  (implements = BitFlags.=)
+
+  (doc str "returns a string representation of the underlying bitmask.")
+  (defn str [f]
+    (str @(BitFlags.mask f)))
+  (implements str BitFlags.str)
+
+  (doc set "returns a new BitFlags with the given flag set.")
+  (defn set [f flag]
+    (BitFlags.init (bit-or @(BitFlags.mask &f) flag)))
+
+  (doc unset "returns a new BitFlags with the given flag unset.")
+  (defn unset [f flag]
+    (BitFlags.init (bit-and @(BitFlags.mask &f) (bit-not flag))))
+)
+
+(defndynamic bitflags-internal [flags]
+  (if (= (length flags) 0)
+    '()
+    (cons (list 'def (car flags) (cadr flags)) (bitflags-internal (cddr flags)))))
+
+(doc bitflags "is a macro to define a set of bitflag constants.
+Example: (bitflags [Read 1 Write 2 Execute 4])")
+(defmacro bitflags [flags]
+  (cons 'do (bitflags-internal flags)))
