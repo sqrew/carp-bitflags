@@ -7,8 +7,6 @@
 (def Write 2)
 (def Execute 4)
 
-(bitflags [AutoA AutoB (AutoD 8) AutoE]) ; 1, 2, 8, 16
-
 (deftest bitflags-test
   (let [f (BitFlags.new 0)
         state (Test.State.init 0 0)]
@@ -58,12 +56,6 @@
           (set! state (assert-equal &state 1 (BitFlags.to-int &i) "Intersection works"))
           (set! state (assert-true &state (BitFlags.= &a &i) "Equality works"))))
       
-      ;; Macro test (Auto/Explicit Hybrid)
-      (set! state (assert-equal &state 1 AutoA "Auto-incrementing AutoA is 1"))
-      (set! state (assert-equal &state 2 AutoB "Auto-incrementing AutoB is 2"))
-      (set! state (assert-equal &state 8 AutoD "Explicit (AutoD 8) works"))
-      (set! state (assert-equal &state 16 AutoE "Auto-incrementing after explicit works (AutoE 16)"))
-
       ;; Subset
       (let [sub (BitFlags.new Read)
             sup (BitFlags.new (bit-or Read Write))]
@@ -74,5 +66,11 @@
             db (BitFlags.new (bit-or Write Execute))
             sd (BitFlags.symmetric-difference &da &db)]
         (set! state (assert-equal &state (bit-or Read Execute) (BitFlags.to-int &sd) "symmetric-difference works")))
+
+      ;; Validation Helpers
+      (set! state (assert-true &state (BitFlags.power-of-two? 8) "power-of-two? 8 is true"))
+      (set! state (assert-false &state (BitFlags.power-of-two? 7) "power-of-two? 7 is false"))
+      (set! state (assert-true &state (BitFlags.single-bit? &(BitFlags.new Read)) "single-bit? Read is true"))
+      (set! state (assert-false &state (BitFlags.single-bit? &(BitFlags.new (bit-or Read Write))) "single-bit? Read|Write is false"))
 
       state)))

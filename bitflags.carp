@@ -5,7 +5,9 @@ The BitFlags module provides a lightweight, zero-overhead abstraction for managi
 It follows a tiered design:
 1. **Inspection**: `contains?` (all bits present), `intersects?` (any bit present), `subset?`, and `empty?`.
 2. **Mutation**: `set!`, `unset!`, `toggle!`, and `clear!` for in-place modifications.
-3. **Functional**: `with`, `without`, `union`, `intersection`, and `symmetric-difference` for creating new flag sets.")
+3. **Functional**: `with`, `without`, `union`, `intersection`, and `symmetric-difference` for creating new flag sets.
+
+The module also provides a `bitflags` macro for defining sets of constants with auto-incrementing powers of two.")
 (deftype (BitFlags t) [
   value t
 ])
@@ -15,7 +17,7 @@ It follows a tiered design:
   (defn new [m]
     (BitFlags.init m))
 
-  (doc from-int "alias for new; creates a BitFlags from a raw integer.")
+  (doc from-int "creates a BitFlags instance from a raw integer.")
   (defn from-int [m]
     (BitFlags.init m))
 
@@ -97,6 +99,16 @@ It follows a tiered design:
   (defn symmetric-difference [a b]
     (BitFlags.init (bit-xor @(BitFlags.value a) @(BitFlags.value b))))
 
+  (doc power-of-two? "checks if a raw integer value is a power of two.")
+  (defn power-of-two? [n]
+    (if (= n (zero))
+      false
+      (= (bit-and n (dec n)) (zero))))
+
+  (doc single-bit? "checks if exactly one bit is set in the BitFlags instance.")
+  (defn single-bit? [f]
+    (BitFlags.power-of-two? (BitFlags.to-int f)))
+
   (doc = "checks if two bitflags sets are identical.")
   (defn = [a b]
     (= @(BitFlags.value a) @(BitFlags.value b)))
@@ -117,18 +129,15 @@ It follows a tiered design:
         ;; Explicit value: (Name Value)
         (let [name (car f)
               val (cadr f)]
-          (do
-            (eval (list 'def name val))
-            (bitflags-internal rest (* val 2))))
+          (cons (list 'def name val) (bitflags-internal rest (* val 2))))
         ;; Auto-incrementing: Name
-        (do
-          (eval (list 'def f current-bit))
-          (bitflags-internal rest (* current-bit 2)))))))
+        (cons (list 'def f current-bit) (bitflags-internal rest (* current-bit 2)))))))
 
 (doc bitflags "is a macro to define a set of bitflag constants. 
 It supports both auto-incrementing powers of two and explicit overrides via (Flag Value) syntax.
-Example: (bitflags [Read Write (Admin 32) Execute])")
+Returns a 'do' block containing the definitions.
+
+Note: In the current version of Carp, macro-generated top-level symbols may not be visible to 
+subsequent forms in the same file. Use in a separate file or define constants manually if needed.")
 (defmacro bitflags [flags]
-  (do
-    (bitflags-internal flags 1)
-    '()))
+  (cons 'do (bitflags-internal flags 1)))
