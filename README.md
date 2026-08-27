@@ -33,21 +33,9 @@ Add this to your project by loading `bitflags.carp`.
 (use BitFlags)
 ```
 
-## Usage
+## Examples
 
-```clojure
-(use BitFlags)
-
-(bitflags [Read Write (Admin 32) Execute]) ; 1, 2, 32, 4
-
-(let [f (BitFlags.new 0)]
-  (do
-    (BitFlags.set! &f Read)
-    (BitFlags.set! &f Write)
-    (IO.println &(str (BitFlags.contains? &f Read))) ; true
-    (BitFlags.toggle! &f Admin)
-    (IO.println &(str (BitFlags.to-int &f))))) ; 35
-```
+See [examples.md](examples.md) for usage examples.
 
 ## Running Tests
 
